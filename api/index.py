@@ -39,22 +39,30 @@ def chat():
         # Configure Gemini
         genai.configure(api_key=GEMINI_API_KEY)
         
-        # Initialize the model - try gemini-pro first (more compatible)
-        try:
-            model = genai.GenerativeModel('gemini-pro')
-        except:
-            # Fallback to gemini-2.0-flash if gemini-pro doesn't work
-            model = genai.GenerativeModel('gemini-2.0-flash')
+        # Try different models in order of preference
+        models_to_try = ['gemini-1.5-flash', 'gemini-pro', 'gemini-2.0-flash']
+        model = None
+        last_error = None
         
-        # Generate response
-        response = model.generate_content(user_message)
+        for model_name in models_to_try:
+            try:
+                model = genai.GenerativeModel(model_name)
+                # Test if model works by generating content
+                response = model.generate_content(user_message)
+                return jsonify({
+                    'response': response.text
+                })
+            except Exception as e:
+                last_error = str(e)
+                continue
         
+        # If all models failed, return error
         return jsonify({
-            'response': response.text
-        })
+            'error': f'Failed to use any available model. Last error: {last_error}'
+        }), 500
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'Error: {str(e)}'}), 500
 
 # Export app for Vercel
 # Vercel will automatically detect the Flask app
