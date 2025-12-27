@@ -19,6 +19,11 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 def index():
     return render_template('index.html')
 
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    from flask import send_from_directory
+    return send_from_directory(app.static_folder, filename)
+
 @app.route('/chat', methods=['POST'])
 def chat():
     try:
