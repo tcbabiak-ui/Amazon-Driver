@@ -39,8 +39,12 @@ def chat():
         # Configure Gemini
         genai.configure(api_key=GEMINI_API_KEY)
         
-        # Initialize the model
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        # Initialize the model - try gemini-pro first (more compatible)
+        try:
+            model = genai.GenerativeModel('gemini-pro')
+        except:
+            # Fallback to gemini-2.0-flash if gemini-pro doesn't work
+            model = genai.GenerativeModel('gemini-2.0-flash')
         
         # Generate response
         response = model.generate_content(user_message)
