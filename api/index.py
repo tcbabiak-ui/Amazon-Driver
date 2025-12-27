@@ -2,8 +2,14 @@ from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 import google.generativeai as genai
 import os
+from pathlib import Path
 
-app = Flask(__name__, template_folder='../templates', static_folder='../static')
+# Get the base directory (api folder's parent)
+BASE_DIR = Path(__file__).parent.parent
+app = Flask(__name__, 
+            template_folder=str(BASE_DIR / 'templates'), 
+            static_folder=str(BASE_DIR / 'static'),
+            static_url_path='/static')
 CORS(app)
 
 # Initialize Gemini API (Vercel uses environment variables)
@@ -41,7 +47,6 @@ def chat():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Vercel serverless function handler
-def handler(request):
-    return app(request.environ, request.start_response)
+# Export app for Vercel
+# Vercel will automatically detect the Flask app
 
