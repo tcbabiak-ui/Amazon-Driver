@@ -54,4 +54,6 @@ def chat():
 
 # Export app for Vercel
 # Vercel will automatically detect the Flask app
+if __name__ == "__main__":
+    app.run(debug=True)
 
