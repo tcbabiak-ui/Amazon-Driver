@@ -34,12 +34,29 @@ def chat():
         # Configure Gemini
         genai.configure(api_key=GEMINI_API_KEY)
         
-        # Try models that work with free tier (gemini-2.0-flash has limit 0 on free tier)
-        # Order: gemini-1.5-flash (best for free tier), then gemini-pro
-        models_to_try = ['gemini-1.5-flash', 'gemini-pro']
-        last_error = None
+        # Get list of available models and try them
+        try:
+            available_models = [m.name.replace('models/', '') for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            # Prioritize models that might work with free tier
+            # Try models in order: flash models first (faster, free tier friendly), then pro models
+            preferred_order = []
+            flash_models = [m for m in available_models if 'flash' in m.lower()]
+            pro_models = [m for m in available_models if 'pro' in m.lower() and 'flash' not in m.lower()]
+            
+            # Prefer flash models, then pro models
+            preferred_order = flash_models + pro_models
+            
+            # If no preferred models, use all available
+            if not preferred_order:
+                preferred_order = available_models[:5]  # Try first 5 available
+        except Exception as e:
+            # Fallback to commonly available models
+            preferred_order = ['gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-2.5-pro']
         
-        for model_name in models_to_try:
+        last_error = None
+        errors = []
+        
+        for model_name in preferred_order:
             try:
                 model = genai.GenerativeModel(model_name)
                 response = model.generate_content(user_message)
@@ -48,23 +65,26 @@ def chat():
                 })
             except Exception as e:
                 error_str = str(e)
+                errors.append(f"{model_name}: {error_str[:100]}")
                 last_error = error_str
-                # If it's a quota error, provide helpful message
-                if '429' in error_str or 'quota' in error_str.lower():
-                    return jsonify({
-                        'error': f'API quota exceeded. Please wait a moment and try again, or check your Google AI Studio quota limits. Error: {error_str[:200]}'
-                    }), 429
+                # If it's a quota error, provide helpful message but continue trying other models
+                if '429' in error_str or ('quota' in error_str.lower() and 'limit: 0' not in error_str):
+                    # If quota limit is 0, skip this model; otherwise might be temporary
+                    if 'limit: 0' in error_str:
+                        continue  # Skip models with 0 quota
+                    # For other quota errors, might be rate limit - try next model
+                    continue
                 # Continue to next model if this one fails
                 continue
         
-        # If all models failed, return error
+        # If all models failed, return detailed error
         if '429' in str(last_error) or 'quota' in str(last_error).lower():
             return jsonify({
-                'error': 'API quota exceeded. Please wait a few minutes and try again. Check your quota at https://ai.dev/usage?tab=rate-limit'
+                'error': f'API quota exceeded or no models available. Tried: {", ".join(preferred_order[:5])}. Check your quota at https://ai.dev/usage?tab=rate-limit. Last error: {last_error[:200]}'
             }), 429
         else:
             return jsonify({
-                'error': f'Failed to use any available model. Last error: {last_error[:300]}'
+                'error': f'Failed to use any available model. Tried: {", ".join(preferred_order[:5])}. Errors: {" | ".join(errors[:3])}'
             }), 500
     
     except Exception as e:
